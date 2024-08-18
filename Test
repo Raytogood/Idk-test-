@@ -1,0 +1,61 @@
+local Players, RunService, Camera = game:GetService("Players"), game:GetService("RunService"), game.Workspace.CurrentCamera
+local tool = Instance.new("Tool", Players.LocalPlayer.Backpack); tool.Name, tool.RequiresHandle, tool.CanBeDropped = "Restock Ray", false, false
+local isLocked, lockedPlayer = false, nil
+
+local function updateESP(player, create)
+    local char = player and player.Character
+    if char then
+        local esp = char:FindFirstChild("Highlight") or Instance.new("Highlight", char)
+        esp.Name, esp.Adornee, esp.OutlineColor, esp.OutlineTransparency, esp.FillTransparency, esp.FillColor = "Highlight", char, Color3.fromRGB(0, 0, 255), 0, create and 1 or nil, create and Color3.fromRGB(0, 0, 255) or nil
+        if not create then esp:Destroy() end
+    end
+end
+
+tool.Activated:Connect(function()
+    if isLocked then
+        updateESP(lockedPlayer, false)
+        isLocked, lockedPlayer = false, nil
+    else
+        local localPlayer = Players.LocalPlayer
+        local rootPart = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if rootPart then
+            local closest, minDist = nil, math.huge
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= localPlayer and player.Character then
+                    local playerPart = player.Character:FindFirstChild("HumanoidRootPart")
+                    if playerPart then
+                        local dist = (playerPart.Position - rootPart.Position).magnitude
+                        if dist < minDist then closest, minDist = player, dist end
+                    end
+                end
+            end
+            lockedPlayer = closest
+            if lockedPlayer then
+                updateESP(lockedPlayer, true)
+                isLocked = true
+            end
+        end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if isLocked and lockedPlayer and lockedPlayer.Character then
+        local pos, vel = lockedPlayer.Character.HumanoidRootPart.Position, lockedPlayer.Character.HumanoidRootPart.Velocity or Vector3.new()
+        Camera.CFrame = CFrame.new(Camera.CFrame.Position, pos + vel * 0.035)
+    end
+end)
+
+tool.Equipped:Connect(function(mouse)
+    mouse.Button1Down:Connect(function()
+        if isLocked and lockedPlayer then
+            updateESP(lockedPlayer, true)
+        end
+    end)
+end)
+
+Players.LocalPlayer.CharacterAdded:Connect(function()
+    tool.Parent = Players.LocalPlayer:WaitForChild("Backpack")
+    if isLocked and lockedPlayer then updateESP(lockedPlayer, true) end
+end)
+
+tool.Parent = Players.LocalPlayer:WaitForChild("Backpack")
